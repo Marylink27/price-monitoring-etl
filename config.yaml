@@ -1,0 +1,69 @@
+# Конфигурация пайплайна мониторинга цен.
+# mode: mock  - демо-режим, данные отдаёт встроенный имитатор API (работает офлайн)
+# mode: live  - реальные HTTP-запросы к API площадок (токены берутся из переменных окружения)
+mode: mock
+
+paths:
+  catalog: data/own_catalog.csv
+  db: data/prices.duckdb
+  reports: reports
+  logs: logs
+
+matching:
+  threshold: 0.82           # минимальная уверенность, когда бренд у предложения указан
+  threshold_no_brand: 0.90  # бренд не указан: порог строже
+  brand_aliases:            # написания брендов на площадках -> бренд в нашей матрице
+    Grand: Гранд
+    Breeze: Бриз
+    Energy Max: Энерджи Макс
+    Bodrost: Бодрость
+
+pricing:
+  in_market_band: 0.03      # отклонение от медианы рынка до 3% считается "в рынке"
+  alert_threshold: 0.10     # алерт, если цена отклоняется от медианы рынка более чем на 10%
+  min_margin: 0.25          # рекомендованная цена не опускает маржу ниже 25%
+
+validation:
+  min_price: 1
+  max_price: 100000
+
+sources:
+  market_a:
+    base_url: https://api.market-a.example/v1
+    endpoint: /catalog/offers
+    token_env: MARKET_A_TOKEN
+    pagination: page          # page=N&page_size=M, в ответе поле pages
+    page_size: 25
+    items_path: items
+    timeout: 10
+    min_interval: 0.5         # секунд между запросами (ограничение частоты)
+    max_retries: 3
+    backoff: 1.0
+  market_b:
+    base_url: https://api.market-b.example/api
+    endpoint: /products/search
+    token_env: MARKET_B_TOKEN
+    pagination: cursor        # cursor=..., в ответе meta.next_cursor
+    page_size: 30
+    items_path: data.products
+    timeout: 10
+    min_interval: 0.5
+    max_retries: 3
+    backoff: 1.0
+  market_c:
+    base_url: https://api.market-c.example/v2
+    endpoint: /offers
+    token_env: MARKET_C_TOKEN
+    pagination: offset        # offset=N&limit=M, конец: страница короче limit
+    page_size: 40
+    items_path: offers
+    timeout: 10
+    min_interval: 0.5
+    max_retries: 3
+    backoff: 1.0
+
+# В демо-режиме паузы и задержки повторов уменьшаются, чтобы прогон шёл секунды
+mock:
+  min_interval: 0.0
+  backoff: 0.01
+  fail_rate: 0.03           # доля запросов, на которые имитатор отвечает временной ошибкой 503
